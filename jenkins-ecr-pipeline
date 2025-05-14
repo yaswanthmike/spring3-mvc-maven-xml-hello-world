@@ -1,0 +1,44 @@
+pipeline {
+    agent any
+    environment {
+        VERSION = "${BUILD_NUMBER}"
+        PROJECT = 'spring3-app-pipeline'
+        IMAGE = "$PROJECT:$VERSION"
+        ECRURL = 'https://783764607931.dkr.ecr.us-east-1.amazonaws.com/spring3app-pipeline'
+        ECRCREDS = 'ecr:us-east-1:aws_credentials'
+    }
+    stages {
+        stage('GetSCM') {
+            steps {
+                git credentialsId: 'github_credentials', url: 'https://github.com/yaswanthmike/spring3-mvc-maven-xml-hello-world.git'
+            }
+        }
+        stage('build') {
+            steps {
+                sh "mvn package"
+            }
+        }
+        stage('Image Build') {
+            steps {
+                script {
+                    sh 'docker build -t $IMAGE .'
+                }
+            }
+        }
+        stage('Push Image') {
+            steps {
+                script {
+                    docker.withRegistry(ECRURL, ECRCREDS) {
+                        docker.image(IMAGE).push()
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            // make sure that the Docker image is removed
+            sh "docker rmi $IMAGE || true"
+        }
+    }
+}
